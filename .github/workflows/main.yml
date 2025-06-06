@@ -7,11 +7,11 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Essa máquina já tem o Docker instalado
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v4 #add-on to checkout to branch
+        uses: actions/checkout@v4 # Add-on to checkout to branch
             
       - name: Configure AWS credentials
         id: configure-aws-credentials
@@ -22,5 +22,12 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Login to AWS ECR
-        id: login-ecr # identificador do step, pode ajudar caso esse step dependa de algo já executado
+        id: login-ecr # Identificador do step, pode ajudar caso esse step dependa de algo já executado
         uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the image to AWS ECR
+        id: build-push-image
+        run: | # precisamos dessa pipe para rodar múltiplos comandos inline
+          docker build -t widget-server:v3 .
+          docker tag widget-server:v3 286549082806.dkr.ecr.us-east-2.amazonaws.com/rocketseat/widget-server:v3
+          docker push 286549082806.dkr.ecr.us-east-2.amazonaws.com/rocketseat/widget-server:v3
