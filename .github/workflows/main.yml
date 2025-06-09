@@ -32,11 +32,19 @@ jobs:
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
       - name: Build and push the image to AWS ECR
-        id: build-push-image
-        env:
-            ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-            ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }} # Nós precisamos indicar o ID do step para conseguir pegar o output
-            IMAGE_TAG: ${{ steps.generate_tag.outputs.sha }}
-        run: | # precisamos dessa pipe para rodar múltiplos comandos inline
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        uses: docker/build-push-action@v6
+        with:
+          context: . # O local para qual vai olhar o dockerfile, como o checkout foi na raíz, podemos usar somente o .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
+
+    #   - name: Build and push the image to AWS ECR
+    #     id: build-push-image
+    #     env:
+    #         ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+    #         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }} # Nós precisamos indicar o ID do step para conseguir pegar o output
+    #         IMAGE_TAG: ${{ steps.generate_tag.outputs.sha }}
+    #     run: | # precisamos dessa pipe para rodar múltiplos comandos inline
+    #       docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+    #       docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
