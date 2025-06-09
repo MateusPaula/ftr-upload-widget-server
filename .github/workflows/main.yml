@@ -1,14 +1,11 @@
-name: widget-server pipe
+name: widget-server pipe ECR
 
 on:
   push:
     branches: ['main']
-    
-env:
-  CONTAINER_REPOSITORY: 'rocketseat/widget-server' 
 
 jobs:
-  build:
+  Build:
     name: Build
     runs-on: ubuntu-latest # Essa máquina já tem o Docker instalado
     steps:
