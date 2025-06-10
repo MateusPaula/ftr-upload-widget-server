@@ -12,6 +12,17 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@v4 # Add-on to checkout to branch
+
+      - name: Configure node
+        id: configure-node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
             
       - name: Configure AWS credentials
         id: configure-aws-credentials
@@ -30,6 +41,24 @@ jobs:
         run: |
           SHA=$(echo $GITHUB_SHA | head -c7) 
           echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+      - name: Build and push the image to AWS ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true # A gente passa esse atributo apenas para exportar o resultado da imagem
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:test
+
+      - name: Run Trivy scanner
+        id: run-trivy-scanner
+        uses: aquasecurity/trivy@0.29.0
+        with:
+          image-ref: '${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:test'
+          format: 'table'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
 
       - name: Build and push the image to AWS ECR
         uses: docker/build-push-action@v6
