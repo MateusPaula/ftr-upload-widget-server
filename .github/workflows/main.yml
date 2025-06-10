@@ -36,17 +36,24 @@ jobs:
         id: login-ecr # Identificador do step, pode ajudar caso esse step dependa de algo já executado
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Docker Buildx
+        id: set-up-docker-buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Generate tag # Queremos pegar a hash do commit e criamos a variavel sha para a saída de uma execução
         id: generate_tag
         run: |
           SHA=$(echo $GITHUB_SHA | head -c7) 
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
-      - name: Build and push the image to AWS ECR
+      - name: Build and push the image
+        id: build-and-export-image
         uses: docker/build-push-action@v6
         with:
           context: .
           load: true # A gente passa esse atributo apenas para exportar o resultado da imagem
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:test
 
@@ -65,6 +72,7 @@ jobs:
         with:
           context: . # O local para qual vai olhar o dockerfile, como o checkout foi na raíz, podemos usar somente o .
           push: true
+          cache-from: type=gha # Não faz sentido usar o cache-to novamente aqui porque só queremos resgatar o cache de cima
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
 
