@@ -8,10 +8,10 @@ jobs:
   Build:
     name: Build
     runs-on: ubuntu-latest # Essa máquina já tem o Docker instalado
-#     steps:
-#       - name: Checkout
-#         id: checkout
-#         uses: actions/checkout@v4 # Add-on to checkout to branch
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4 # Add-on to checkout to branch
             
 #       - name: Login to DockerHub
 #         id: login-docker-hub
