@@ -1,0 +1,33 @@
+services:
+  database:
+    image: "postgres:16.0-alpine3.18"
+    container_name: postgres
+    restart: unless-stopped
+    env_file: ./.env.example
+    ports: [5432:5432]
+    volumes:
+      - db:/var/lib/postgresql/data # esse caminho vai ter a estrutura e informação do banco
+    networks:
+      - widget
+      - db
+
+  app:
+    build: .
+    depends_on:
+      - database
+    restart: unless-stopped
+    container_name: widget-server
+    env_file: ./.env
+    ports:
+      - 3000:$PORT # interface/container
+    networks:
+      - widget
+      - db
+
+volumes: # vai usar o próprio disco rídido pra manter o volume
+  db:
+networks:
+  widget:
+    driver: bridge
+  db:
+    driver: bridge
