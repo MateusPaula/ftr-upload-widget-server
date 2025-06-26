@@ -67,14 +67,14 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
 
-      - name: Build and push the image to AWS ECR
-        uses: docker/build-push-action@v6
-        with:
-          context: . # O local para qual vai olhar o dockerfile, como o checkout foi na raíz, podemos usar somente o .
-          push: true
-          cache-from: type=gha # Não faz sentido usar o cache-to novamente aqui porque só queremos resgatar o cache de cima
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
+      # - name: Build and push the image to AWS ECR
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: . # O local para qual vai olhar o dockerfile, como o checkout foi na raíz, podemos usar somente o .
+      #     push: true
+      #     cache-from: type=gha # Não faz sentido usar o cache-to novamente aqui porque só queremos resgatar o cache de cima
+      #     tags: |
+      #       ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
 
     #   - name: Build and push the image to AWS ECR
     #     id: build-push-image
@@ -85,3 +85,19 @@ jobs:
     #     run: | # precisamos dessa pipe para rodar múltiplos comandos inline
     #       docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
     #       docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # - name: Deploy to App Runner
+      #   id: deploy-app-runner
+      #   uses: awslabs/amazon-app-runner-deploy@main
+      #   with:
+      #     service: ${{ vars.APP_RUNNER_SERVICE_NAME }}
+      #     image: ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
+      #     region: ${{ vars.AWS_REGION }}
+      #     access-role-arn: ${{ secrets.ROLE_ARN }} # Amazon resource name - nós precisamos criar uma nova role na aws
+      #     cpu: 1
+      #     memory: 2
+      #     port: 3333
+      #     wait-for-service-stability-seconds: 180
+
+      # - name: App runner Check
+      #   run: echo "App Running... ${{ steps.deploy-app-runner.outputs.service-url }}"
