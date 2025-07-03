@@ -2,7 +2,14 @@ name: widget-server pipe ECR
 
 on:
   push:
-    branches: ['main']
+    branches:
+      - 'main'
+
+env:
+  ECS_SERVICE: widget-server
+  ECS_CLUSTER: rocketseat-ecs
+  CONTAINER_NAME: widget-server
+  ECS_TASK_DEFINITION: .aws/task-definition.json
 
 jobs:
   Build:
@@ -13,18 +20,24 @@ jobs:
         id: checkout
         uses: actions/checkout@v4 # Add-on to checkout to branch
 
-      - name: Configure node
+      - name: Configure Node
         id: configure-node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
+      
       - name: Install pnpm
+        id: install-pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
-            
-      - name: Configure AWS credentials
+          version: 8
+
+      - name: Install dependencies
+        id: install-dependencies
+        run: |
+          pnpm Install
+
+      - name: Configure AWS Credentials
         id: configure-aws-credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -41,13 +54,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Generate tag # Queremos pegar a hash do commit e criamos a variavel sha para a saída de uma execução
-        id: generate_tag
+        id: generate-tag
         run: |
-          SHA=$(echo $GITHUB_SHA | head -c7) 
+          SHA=$(echo $GITHUB_SHA | head -c7)
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
-      - name: Build and push the image
-        id: build-and-export-image
+      - name: Build and export image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -55,43 +67,51 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:test
+            ${{ steps.login-ecr.outputs.registry}}/${{ vars.ECR_REPOSITORY }}:test
 
       - name: Run Trivy scanner
         id: run-trivy-scanner
         uses: aquasecurity/trivy-action@0.31.0
         with:
-          image-ref: '${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:test'
+          image-ref: '${{steps.login-ecr.outputs.registry}}/${{ vars.ECR_REPOSITORY }}:test'
           format: 'table'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+      
+      - name: Build and push the image to AWS ECR
+        id: build-and-push-the-image-to-aws-ecr
+        uses: docker/build-push-action@v6
+        with:
+          context: . # O local para qual vai olhar o dockerfile, como o checkout foi na raíz, podemos usar somente o .
+          push: true
+          cache-from: type=gha # Não faz sentido usar o cache-to novamente aqui porque só queremos resgatar o cache de cima
+          tags: |
+            ${{steps.login-ecr.outputs.registry}}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate-tag.outputs.sha }}
 
-      # - name: Build and push the image to AWS ECR
-      #   uses: docker/build-push-action@v6
-      #   with:
-      #     context: . # O local para qual vai olhar o dockerfile, como o checkout foi na raíz, podemos usar somente o .
-      #     push: true
-      #     cache-from: type=gha # Não faz sentido usar o cache-to novamente aqui porque só queremos resgatar o cache de cima
-      #     tags: |
-      #       ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
+      - name: Render task definition
+        id: reder-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{steps.login-ecr.outputs.registry}}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate-tag.outputs.sha }}
 
-    #   - name: Build and push the image to AWS ECR
-    #     id: build-push-image
-    #     env:
-    #         ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-    #         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }} # Nós precisamos indicar o ID do step para conseguir pegar o output
-    #         IMAGE_TAG: ${{ steps.generate_tag.outputs.sha }}
-    #     run: | # precisamos dessa pipe para rodar múltiplos comandos inline
-    #       docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-    #       docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Deploy Amazon ECS
+        id: deploy-amazon-ecs
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.reder-task-definition.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
 
       # - name: Deploy to App Runner
       #   id: deploy-app-runner
       #   uses: awslabs/amazon-app-runner-deploy@main
       #   with:
       #     service: ${{ vars.APP_RUNNER_SERVICE_NAME }}
-      #     image: ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate_tag.outputs.sha }}
+      #     image: ${{steps.login-ecr.outputs.registry}}/${{ vars.ECR_REPOSITORY }}:${{ steps.generate-tag.outputs.sha }}
       #     region: ${{ vars.AWS_REGION }}
       #     access-role-arn: ${{ secrets.ROLE_ARN }} # Amazon resource name - nós precisamos criar uma nova role na aws
       #     cpu: 1
@@ -99,5 +119,5 @@ jobs:
       #     port: 3333
       #     wait-for-service-stability-seconds: 180
 
-      # - name: App runner Check
-      #   run: echo "App Running... ${{ steps.deploy-app-runner.outputs.service-url }}"
+      # - name: App Runner Check
+      #   run: echo "App running... ${{ steps.deploy-app-runner.outputs.service-url }}"
